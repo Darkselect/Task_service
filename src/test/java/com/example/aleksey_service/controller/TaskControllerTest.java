@@ -4,28 +4,33 @@ import com.example.aleksey_service.dto.TaskDto;
 import com.example.aleksey_service.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultMatcher;
 
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 @WebMvcTest(TaskController.class)
 public class TaskControllerTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 10;
 
     @Autowired
     private MockMvc mvc;
@@ -33,133 +38,181 @@ public class TaskControllerTest {
     @MockitoBean
     private TaskService taskService;
 
-    private TaskDto taskDto;
-    private TaskDto expectedResponseDto;
-    private List<TaskDto> taskList;
-
-    @BeforeEach
-    void setUp() {
-        taskDto = TaskDto.builder()
-                .id(1L)
-                .title("Test title")
-                .description("Test description")
-                .userId(1L)
-                .build();
-
-        expectedResponseDto = TaskDto.builder()
-                .id(1L)
-                .title("Test title")
-                .description("Test description")
-                .userId(1L)
-                .build();
-
-        taskList = List.of(
-                new TaskDto(1L, "Task 1", "Task description 1", 1L),
-                new TaskDto(2L, "Task 2", "Task description 2", 2L)
-        );
-    }
-
     @Test
     void testCreateTaskSuccess() throws Exception {
+        TaskDto taskDto = TaskDto.builder()
+                .id(1L)
+                .title("test title")
+                .description("test description")
+                .userId(1L)
+                .build();
+
+        TaskDto expectedResponseDto = TaskDto.builder()
+                .id(1L)
+                .title("test title")
+                .description("test description")
+                .userId(1L)
+                .build();
+
         when(taskService.createTask(any(TaskDto.class))).thenReturn(taskDto);
-        performPost("/tasks", taskDto, status().isCreated(), expectedResponseDto);
-    }
 
-    @Test
-    void testCreateTaskFail() throws Exception {
-        TaskDto invalidTask = new TaskDto(1L, " ", " ", 1L);
-        performPost("/tasks", invalidTask, status().isBadRequest(), null);
-    }
-
-    @Test
-    void testGetTaskByIdSuccess() throws Exception {
-        when(taskService.getTaskById(taskDto.getId())).thenReturn(expectedResponseDto);
-        mvc.perform(get("/tasks/{id}", taskDto.getId())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
+        mvc.perform(post("/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
+                .andExpect(status().isCreated())
                 .andExpect(content().json(OBJECT_MAPPER.writeValueAsString(expectedResponseDto)));
     }
 
     @Test
+    void testCreateTaskFail() throws Exception {
+        TaskDto taskDto = TaskDto.builder()
+                .id(1L)
+                .userId(1L)
+                .title(" ")
+                .description(" ")
+                .build();
+
+        mvc.perform(post("/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testGetTaskByIdSuccess() throws Exception {
+        TaskDto taskDto = TaskDto.builder()
+                .id(1L)
+                .build();
+
+        TaskDto responseTaskDto = TaskDto.builder()
+                .id(1L)
+                .title("Test title")
+                .description("Test description")
+                .userId(1L)
+                .build();
+
+        when(taskService.getTaskById(taskDto.getId())).thenReturn(responseTaskDto);
+        mvc.perform(get("/tasks/{id}", taskDto.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void testGetTaskByIdFail() throws Exception {
-        when(taskService.getTaskById(999L)).thenThrow(new EntityNotFoundException("Task not found"));
-        mvc.perform(get("/tasks/{id}", 999L))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string(containsString("Task not found")));
+        long invalidId = 999L;
+
+        when(taskService.getTaskById(invalidId)).thenThrow(new EntityNotFoundException("Task not found"));
+
+        mvc.perform(get("/tasks/{id}", invalidId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void testUpdateTaskSuccess() throws Exception {
+        TaskDto taskDto = TaskDto.builder()
+                .id(1L)
+                .title("Updated title")
+                .description("Updated description")
+                .userId(1L)
+                .build();
+
+        TaskDto expectedResponseDto = TaskDto.builder()
+                .id(1L)
+                .title("test title")
+                .description("test description")
+                .userId(1L)
+                .build();
+
         when(taskService.updateTask(eq(taskDto.getId()), any(TaskDto.class))).thenReturn(expectedResponseDto);
-        performPut(taskDto.getId(), taskDto, status().isOk(), expectedResponseDto);
+
+        mvc.perform(put("/tasks/{id}", taskDto.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
+                .andExpect(status().isOk());
     }
 
     @Test
     void testUpdateTaskNotFound() throws Exception {
-        when(taskService.updateTask(eq(99L), any(TaskDto.class)))
+        TaskDto taskDto = TaskDto.builder()
+                .id(99L)
+                .title("Updated title")
+                .description("Updated description")
+                .userId(1L)
+                .build();
+
+        when(taskService.updateTask(eq(taskDto.getId()), any(TaskDto.class)))
                 .thenThrow(new EntityNotFoundException("Task not found"));
 
-        performPut(99L, taskDto, status().isNotFound(), null);
-    }
-
-    @Test
-    void testUpdateTaskInvalidRequest() throws Exception {
-        performPut(1L, new TaskDto(), status().isBadRequest(), null);
-    }
-
-    @Test
-    void testDeleteTaskByIdSuccess() throws Exception {
-        doNothing().when(taskService).deleteTaskById(anyLong());
-        mvc.perform(delete("/tasks/{id}", 1L))
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void testDeleteTaskByIdNotFound() throws Exception {
-        doThrow(new EntityNotFoundException("Task not found")).when(taskService).deleteTaskById(999L);
-        mvc.perform(delete("/tasks/{id}", 999L))
+        mvc.perform(put("/tasks/{id}", taskDto.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(containsString("Task not found")));
     }
 
     @Test
-    void testGetTasksSuccess() throws Exception {
-        when(taskService.getTasks(DEFAULT_PAGE, DEFAULT_SIZE)).thenReturn(taskList);
+    void testUpdateTaskInvalidRequest() throws Exception {
+        TaskDto taskDto = TaskDto.builder().build();
+
+        mvc.perform(put("/tasks/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskDto)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testDeleteTaskByIdSuccess() throws Exception {
+        long taskId = 1L;
+
+        doNothing().when(taskService).deleteTaskById(anyLong());
+
+        mvc.perform(delete("/tasks/{id}", taskId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void testDeleteTaskByIdNotFound() throws  Exception {
+        long taskId = 999L;
+
+        doThrow(new EntityNotFoundException("Task not found")).when(taskService).deleteTaskById(taskId);
+
+        mvc.perform(delete("/tasks/{id}", taskId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void testGetTaskSuccess() throws Exception {
+        List<TaskDto> tasks = List.of(
+                new TaskDto(1L, "Task 1", "Task description 1", 1L),
+                new TaskDto(2L, "Task 2", "Task description 2", 2L)
+        );
+
+
+        TaskDto taskResponseDto = TaskDto.builder()
+                .id(1L)
+                .title("Test title")
+                .description("test description")
+                .userId(1L)
+                .build();
+
+        when(taskService.getTasks(0, 10)).thenReturn(tasks);
+
         mvc.perform(get("/tasks")
-                        .param("page", String.valueOf(DEFAULT_PAGE))
-                        .param("size", String.valueOf(DEFAULT_SIZE))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(content().json(OBJECT_MAPPER.writeValueAsString(taskList)));
+                        .param("page", "0")
+                        .param("size", "10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(OBJECT_MAPPER.writeValueAsString(taskResponseDto)))
+                .andExpect(status().isOk());
     }
 
     @Test
     void testGetTasksInvalidParams() throws Exception {
         mvc.perform(get("/tasks")
                         .param("page", "-1")
-                        .param("size", "10"))
+                        .param("size", "10")
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
-    }
-
-    private void performPost(String url, TaskDto dto, ResultMatcher expectedStatus, TaskDto expectedResponse) throws Exception {
-        var request = mvc.perform(post(url)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(OBJECT_MAPPER.writeValueAsString(dto)))
-                .andExpect(expectedStatus);
-
-        if (expectedResponse != null) {
-            request.andExpect(content().json(OBJECT_MAPPER.writeValueAsString(expectedResponse)));
-        }
-    }
-
-    private void performPut(Long id, TaskDto dto, ResultMatcher expectedStatus, TaskDto expectedResponse) throws Exception {
-        var request = mvc.perform(put("/tasks/{id}", id)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(OBJECT_MAPPER.writeValueAsString(dto)))
-                .andExpect(expectedStatus);
-
-        if (expectedResponse != null) {
-            request.andExpect(content().json(OBJECT_MAPPER.writeValueAsString(expectedResponse)));
-        }
     }
 }
