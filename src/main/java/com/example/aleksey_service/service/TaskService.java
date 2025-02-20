@@ -65,17 +65,22 @@ public class TaskService {
     public void deleteTaskById(Long id) {
         if (!taskRepository.existsById(id)) {
             log.error("Task with id {} does not exist", id);
-            throw new RuntimeException(String.format("Task with id %s does not exist", id));
+            throw new EntityNotFoundException(String.format("Task with id %s does not exist", id));
         }
         taskRepository.deleteTaskById(id);
     }
 
     @Transactional
     public List<TaskDto> getTasks(int page, int size) {
+        log.info("Fetching tasks with page: {} and size: {}", page, size);
+
         Pageable pageable = PageRequest.of(page, size);
-        return taskRepository.getAllTasks(pageable)
+        List<TaskDto> tasks = taskRepository.getAllTasks(pageable)
                 .stream()
                 .map(taskMapper::taskEntityToTaskDto)
                 .toList();
+
+        log.info("Retrieved {} tasks", tasks.size());
+        return tasks;
     }
 }

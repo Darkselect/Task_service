@@ -5,25 +5,21 @@ import com.example.aleksey_service.entity.TaskEntity;
 import com.example.aleksey_service.mapper.TaskMapper;
 import com.example.aleksey_service.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.hibernate.action.internal.EntityActionVetoException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class TaskServiceTest {
@@ -36,58 +32,48 @@ public class TaskServiceTest {
     @Mock
     private TaskMapper taskMapper;
 
+    private TaskDto createTaskDto(Long id, String title, String description, Long userId) {
+        return TaskDto.builder()
+                .id(id)
+                .title(title)
+                .description(description)
+                .userId(userId)
+                .build();
+    }
+
+    private TaskEntity createTaskEntity(String title, String description, Long userId) {
+        return TaskEntity.builder()
+                .id(1L)
+                .title(title)
+                .description(description)
+                .userId(userId)
+                .build();
+    }
+
     @Test
     void testCreateTaskSuccess() {
-        TaskDto taskDto = TaskDto.builder()
-                .id(1L)
-                .title("Test title")
-                .description("test description")
-                .userId(1L)
-                .build();
+        TaskDto taskDto = createTaskDto(1L, "Test title", "test description", 1L);
+        TaskEntity taskEntity = createTaskEntity("Test title", "test description", 1L);
 
+        when(taskRepository.findTaskById(taskDto.getId())).thenReturn(Optional.empty());
+        when(taskRepository.save(any(TaskEntity.class))).thenReturn(taskEntity);
+        when(taskMapper.taskToTaskEntity(any(TaskDto.class))).thenReturn(taskEntity);
+        when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
 
-        TaskEntity taskEntity = TaskEntity.builder()
-                .id(1L)
-                .title("Test title")
-                .description("test description")
-                .userId(1L)
-                .build();
-        Result result = new Result(taskDto, taskEntity);
-
-
-        when(taskRepository.findTaskById(result.taskDto().getId())).thenReturn(Optional.empty());
-        when(taskRepository.save(any(TaskEntity.class))).thenReturn(result.taskEntity());
-        when(taskMapper.taskToTaskEntity(any(TaskDto.class))).thenReturn(result.taskEntity());
-        when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(result.taskDto());
-
-        TaskDto createdTask = taskService.createTask(result.taskDto());
+        TaskDto createdTask = taskService.createTask(taskDto);
 
         assertNotNull(createdTask);
-        assertEquals(result.taskDto().getId(), createdTask.getId());
-        assertEquals(result.taskDto().getTitle(), createdTask.getTitle());
-        assertEquals(result.taskDto().getDescription(), createdTask.getDescription());
+        assertEquals(taskDto.getId(), createdTask.getId());
+        assertEquals(taskDto.getTitle(), createdTask.getTitle());
+        assertEquals(taskDto.getDescription(), createdTask.getDescription());
 
         verify(taskRepository).save(any(TaskEntity.class));
     }
 
-    private record Result(TaskDto taskDto, TaskEntity taskEntity) {
-    }
-
     @Test
     void testCreateTaskAlreadyExists() {
-        TaskDto taskDto = TaskDto.builder()
-                .id(1L)
-                .title("Test title")
-                .description("Test description")
-                .userId(1L)
-                .build();
-
-        TaskEntity taskEntity = TaskEntity.builder()
-                .id(1L)
-                .title("Test title")
-                .description("Test description")
-                .userId(1L)
-                .build();
+        TaskDto taskDto = createTaskDto(1L, "Test title", "Test description", 1L);
+        TaskEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
 
         when(taskRepository.findTaskById(taskDto.getId())).thenReturn(Optional.of(taskEntity));
 
@@ -99,18 +85,8 @@ public class TaskServiceTest {
 
     @Test
     void testGetTaskByIdSuccess() {
-        TaskDto taskDto = TaskDto.builder()
-                .id(1L)
-                .build();
-
-        TaskEntity taskEntity = TaskEntity.builder()
-                .id(1L)
-                .title("Test title")
-                .description("Test description")
-                .userId(1L)
-                .build();
-
-
+        TaskDto taskDto = createTaskDto(1L, "Test title", "Test description", 1L);
+        TaskEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
 
         when(taskRepository.findTaskById(anyLong())).thenReturn(Optional.of(taskEntity));
         when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
@@ -128,35 +104,18 @@ public class TaskServiceTest {
 
     @Test
     void testGetTaskByIdNotFound() {
-         TaskDto taskDto = TaskDto.builder()
-                 .id(999L)
-                 .build();
+        when(taskRepository.findTaskById(999L)).thenReturn(Optional.empty());
 
-         when(taskRepository.findTaskById(taskDto.getId())).thenReturn(Optional.empty());
-
-         assertThrows(EntityNotFoundException.class, () -> taskService.getTaskById(taskDto.getId()));
+        assertThrows(EntityNotFoundException.class, () -> taskService.getTaskById(999L));
     }
 
     @Test
     void testUpdateTaskById() {
-        TaskDto taskDto = TaskDto.builder()
-                .id(1L)
-                .title("Updated title")
-                .description("Updated description")
-                .userId(2L)
-                .build();
-
-
-        TaskEntity taskEntity = TaskEntity.builder()
-                .id(1L)
-                .title("Updated title")
-                .description("Updated description")
-                .userId(2L)
-                .build();
+        TaskDto taskDto = createTaskDto(1L, "Updated title", "Updated description", 2L);
+        TaskEntity taskEntity = createTaskEntity("Updated title", "Updated description", 2L);
 
         when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId()))
                 .thenReturn(taskEntity);
-
         when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
 
         TaskDto responseDto = taskService.updateTask(taskDto.getId(), taskDto);
@@ -173,12 +132,7 @@ public class TaskServiceTest {
 
     @Test
     void testUpdateTaskByIdNotFound() {
-        TaskDto taskDto = TaskDto.builder()
-                .id(99L)
-                .title("Updated title")
-                .description("Updated description")
-                .userId(2L)
-                .build();
+        TaskDto taskDto = createTaskDto(99L, "Updated title", "Updated description", 2L);
 
         when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId()))
                 .thenReturn(null);
@@ -202,6 +156,43 @@ public class TaskServiceTest {
         verify(taskRepository).deleteTaskById(taskId);
     }
 
+    @Test
+    void testDeleteTaskByIdNotFound() {
+        long taskId = 99L;
+        assertThrows(EntityNotFoundException.class, () -> taskService.deleteTaskById(taskId));
+    }
 
+    @Test
+    void testGetTasksSuccess() {
+        int page = 0;
+        int size = 5;
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        TaskEntity taskEntity = createTaskEntity("test title", "test description", 1L);
+
+        TaskDto taskDto = createTaskDto(1L, "test title", "test description", 1L);
+
+        when(taskRepository.getAllTasks(pageable)).thenReturn(List.of(taskEntity));
+        when(taskMapper.taskEntityToTaskDto(taskEntity)).thenReturn(taskDto);
+
+        List<TaskDto> tasks = taskService.getTasks(page, size);
+
+        assertEquals(1, tasks.size());
+        assertEquals(taskDto, tasks.get(0));
+    }
+
+    @Test
+    void testGetTasksEmptyList() {
+        int page = 0;
+        int size = 5;
+        Pageable pageable = PageRequest.of(page, size);
+
+        when(taskRepository.getAllTasks(pageable)).thenReturn(Collections.emptyList());
+
+        List<TaskDto> tasks = taskService.getTasks(page, size);
+
+        assertTrue(tasks.isEmpty());
+    }
 
 }
