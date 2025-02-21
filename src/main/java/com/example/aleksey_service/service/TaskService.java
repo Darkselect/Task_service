@@ -38,7 +38,6 @@ public class TaskService {
         return taskMapper.taskEntityToTaskDto(savedTask);
     }
 
-    @Transactional
     public TaskDto getTaskById(Long id) {
         TaskEntity taskEntity = taskRepository.findTaskById(id)
                 .orElseThrow(() -> {
