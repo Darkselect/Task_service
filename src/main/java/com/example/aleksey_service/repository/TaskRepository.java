@@ -17,7 +17,6 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
     @Query(value = "SELECT t FROM TaskEntity t WHERE t.id = :id")
     Optional<TaskEntity> findTaskById(Long id);
 
-
     @Query(nativeQuery = true, value = """
                     UPDATE task
                     SET title = COALESCE(:title, task.title),
