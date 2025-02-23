@@ -17,15 +17,12 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
     @Query(value = "SELECT t FROM TaskEntity t WHERE t.id = :id")
     Optional<TaskEntity> findTaskById(Long id);
 
-    @Modifying
     @Query(nativeQuery = true, value = """
-                INSERT INTO task (id, title, description, user_id)
-                VALUES (:id, :title, :description, :user_id)
-                ON CONFLICT (id) 
-                DO UPDATE 
+                    UPDATE task
                     SET title = COALESCE(:title, task.title),
                         description = COALESCE(:description, task.description),
                         user_id = COALESCE(:user_id, task.user_id)
+                        WHERE id = :id
                 RETURNING *
             """)
     TaskEntity updateTask(@Param("id") long id, @Param("title") String title, @Param("description") String description, @Param("user_id") long userId);
@@ -35,6 +32,6 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
     @Query(value = "DELETE FROM TaskEntity t WHERE t.id = :id")
     void deleteTaskById(@Param("id")Long id);
 
-    @Query("SELECT t FROM TaskEntity t")
+    @Query(value = "SELECT t from TaskEntity t")
     List<TaskEntity> getAllTasks(Pageable pageable);
 }

@@ -1,5 +1,8 @@
 package com.example.aleksey_service.service;
 
+import com.example.aleksey_service.asspect.annotation.AfterReturningLogging;
+import com.example.aleksey_service.asspect.annotation.BeforeLoggingAspect;
+import com.example.aleksey_service.asspect.annotation.ExceptionLogging;
 import com.example.aleksey_service.dto.TaskDto;
 import com.example.aleksey_service.entity.TaskEntity;
 import com.example.aleksey_service.mapper.TaskMapper;
@@ -8,6 +11,7 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.annotation.AfterThrowing;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -24,36 +28,36 @@ public class TaskService {
     private final TaskMapper taskMapper;
 
     @Transactional
+    @ExceptionLogging
+    @AfterReturningLogging
     public TaskDto createTask(TaskDto taskDto) {
         Optional<TaskEntity> taskEntity = taskRepository.findTaskById(taskDto.getId());
 
         if (taskEntity.isPresent()) {
-            log.error("Task with id {} already exists", taskDto.getId());
-            throw new RuntimeException("Task already exists!");
+            throw new IllegalStateException();
         }
 
         TaskEntity savedTask = taskRepository.save(taskMapper.taskToTaskEntity(taskDto));
 
-        log.info("Task created {}", taskDto.getId());
         return taskMapper.taskEntityToTaskDto(savedTask);
     }
 
+    @Transactional
+    @AfterThrowing
+    @AfterReturningLogging
     public TaskDto getTaskById(Long id) {
         TaskEntity taskEntity = taskRepository.findTaskById(id)
-                .orElseThrow(() -> {
-                    log.warn("Task with id {} does not exist", id);
-                    return new EntityNotFoundException("Task does not exist!");
-                });
+                .orElseThrow(() -> new EntityNotFoundException("Task does not exist!"));
 
         return taskMapper.taskEntityToTaskDto(taskEntity);
     }
 
+    @ExceptionLogging
     @Transactional
     public TaskDto updateTask(Long id, TaskDto taskDto) {
         TaskEntity taskEntity = taskRepository.updateTask(id, taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId());
 
         if (taskEntity == null) {
-            log.error("Task with id {}, not found", id);
             throw new EntityNotFoundException("Task not found");
         }
 
@@ -61,25 +65,23 @@ public class TaskService {
     }
 
     @Transactional
+    @AfterThrowing
+    @AfterReturningLogging
     public void deleteTaskById(Long id) {
         if (!taskRepository.existsById(id)) {
-            log.error("Task with id {} does not exist", id);
             throw new EntityNotFoundException(String.format("Task with id %s does not exist", id));
         }
         taskRepository.deleteTaskById(id);
     }
 
     @Transactional
+    @BeforeLoggingAspect
+    @AfterReturningLogging
     public List<TaskDto> getTasks(int page, int size) {
-        log.info("Fetching tasks with page: {} and size: {}", page, size);
-
         Pageable pageable = PageRequest.of(page, size);
-        List<TaskDto> tasks = taskRepository.getAllTasks(pageable)
+        return taskRepository.getAllTasks(pageable)
                 .stream()
                 .map(taskMapper::taskEntityToTaskDto)
                 .toList();
-
-        log.info("Retrieved {} tasks", tasks.size());
-        return tasks;
     }
 }
