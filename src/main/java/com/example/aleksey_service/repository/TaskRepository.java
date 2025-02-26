@@ -40,6 +40,6 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
     @Query(value = "DELETE FROM TaskEntity t WHERE t.id = :id")
     void deleteTaskById(@Param("id")Long id);
 
-    @Query("SELECT t FROM TaskEntity t")
+    @Query(value = "SELECT t from TaskEntity t")
     List<TaskEntity> getAllTasks(Pageable pageable);
 }
