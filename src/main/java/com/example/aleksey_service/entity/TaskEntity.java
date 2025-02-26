@@ -26,7 +26,10 @@ public class TaskEntity {
     @Column(name = "user_id")
     private Long userId;
 
-    @Version()
+    @Version
     @Column(name = "version", nullable = false)
     private Integer version = 0;
+
+    @Enumerated(EnumType.STRING)
+    private TaskStatus taskStatus;
 }

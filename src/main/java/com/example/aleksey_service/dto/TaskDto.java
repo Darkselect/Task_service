@@ -9,7 +9,6 @@ import lombok.*;
 @Setter
 @Builder
 public class TaskDto {
-
     private long id;
 
     @NotBlank(message = "title can not be null or empty")
@@ -19,4 +18,6 @@ public class TaskDto {
     private String description;
 
     private Long userId;
+
+    private String taskStatus;
 }

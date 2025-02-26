@@ -114,7 +114,7 @@ public class TaskServiceTest {
         TaskDto taskDto = createTaskDto(1L, "Updated title", "Updated description", 2L);
         TaskEntity taskEntity = createTaskEntity("Updated title", "Updated description", 2L);
 
-        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId()))
+        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus()))
                 .thenReturn(taskEntity);
         when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
 
@@ -126,7 +126,7 @@ public class TaskServiceTest {
         assertEquals(taskDto.getDescription(), responseDto.getDescription());
         assertEquals(taskDto.getUserId(), responseDto.getUserId());
 
-        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId());
+        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus());
         verify(taskMapper).taskEntityToTaskDto(taskEntity);
     }
 
@@ -134,12 +134,12 @@ public class TaskServiceTest {
     void testUpdateTaskByIdNotFound() {
         TaskDto taskDto = createTaskDto(99L, "Updated title", "Updated description", 2L);
 
-        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId()))
+        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus()))
                 .thenReturn(null);
 
         assertThrows(EntityNotFoundException.class, () -> taskService.updateTask(taskDto.getId(), taskDto));
 
-        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId());
+        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus());
         verify(taskMapper, never()).taskEntityToTaskDto(any());
     }
 

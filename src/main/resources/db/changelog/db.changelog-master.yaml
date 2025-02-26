@@ -1,3 +1,7 @@
 databaseChangeLog:
   - include:
       file: db/changelog/changeset/task_V001_initial.sql
+  - include:
+      file: db/changelog/changeset/task_V002_add_version.sql
+  - include:
+      file: db/changelog/changeset/task_V003_add_status_column.sql

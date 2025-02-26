@@ -185,8 +185,8 @@ public class TaskControllerTest {
     @Test
     void testGetTaskSuccess() throws Exception {
         List<TaskDto> tasks = List.of(
-                new TaskDto(1L, "Task 1", "Task description 1", 1L),
-                new TaskDto(2L, "Task 2", "Task description 2", 2L)
+                new TaskDto(1L, "Task 1", "Task description 1", 1L, "Created"),
+                new TaskDto(2L, "Task 2", "Task description 2", 2L,"Created")
         );
 
 

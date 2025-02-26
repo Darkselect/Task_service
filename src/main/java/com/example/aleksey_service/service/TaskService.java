@@ -51,7 +51,8 @@ public class TaskService {
 
     @Transactional
     public TaskDto updateTask(Long id, TaskDto taskDto) {
-        TaskEntity taskEntity = taskRepository.updateTask(id, taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId());
+        TaskEntity taskEntity =
+                taskRepository.updateTask(id, taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus());
 
         if (taskEntity == null) {
             log.error("Task with id {}, not found", id);

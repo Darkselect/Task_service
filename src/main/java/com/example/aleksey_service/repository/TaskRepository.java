@@ -19,16 +19,21 @@ public interface TaskRepository extends JpaRepository<TaskEntity, Long> {
 
     @Modifying
     @Query(nativeQuery = true, value = """
-                INSERT INTO task (id, title, description, user_id)
-                VALUES (:id, :title, :description, :user_id)
+                INSERT INTO task (id, title, description, user_id, task_status)
+                VALUES (:id, :title, :description, :user_id, :task_status)
                 ON CONFLICT (id) 
                 DO UPDATE 
                     SET title = COALESCE(:title, task.title),
                         description = COALESCE(:description, task.description),
-                        user_id = COALESCE(:user_id, task.user_id)
+                        user_id = COALESCE(:user_id, task.user_id),
+                        task_status = COALESCE(:task_status, task.task_status)
                 RETURNING *
             """)
-    TaskEntity updateTask(@Param("id") long id, @Param("title") String title, @Param("description") String description, @Param("user_id") long userId);
+    TaskEntity updateTask(@Param("id") long id,
+                          @Param("title") String title,
+                          @Param("description") String description,
+                          @Param("user_id") long userId,
+                          @Param("task_status") String taskStatus);
 
 
     @Modifying
