@@ -3,8 +3,12 @@ package com.example.aleksey_service.service;
 import com.example.aleksey_service.asspect.annotation.AfterReturningLogging;
 import com.example.aleksey_service.asspect.annotation.BeforeLoggingAspect;
 import com.example.aleksey_service.asspect.annotation.ExceptionLogging;
+import com.example.aleksey_service.entity.TasksEntity;
+import com.example.aleksey_service.kafka.KafkaTaskProducer;
+import com.example.aleksey_service.dto.KafkaDto;
 import com.example.aleksey_service.dto.TaskDto;
-import com.example.aleksey_service.entity.TaskEntity;
+import com.example.aleksey_service.dto.TaskResponseDto;
+import com.example.aleksey_service.dto.UpdatedDto;
 import com.example.aleksey_service.mapper.TaskMapper;
 import com.example.aleksey_service.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,18 +30,20 @@ import java.util.Optional;
 public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskMapper taskMapper;
+    private final KafkaTaskProducer kafkaTaskProducer;
 
     @Transactional
     @ExceptionLogging
     @AfterReturningLogging
     public TaskDto createTask(TaskDto taskDto) {
-        Optional<TaskEntity> taskEntity = taskRepository.findTaskById(taskDto.getId());
+        Optional<TasksEntity> taskEntity = taskRepository.findTaskById(taskDto.getId());
 
         if (taskEntity.isPresent()) {
             throw new IllegalStateException();
         }
 
-        TaskEntity savedTask = taskRepository.save(taskMapper.taskToTaskEntity(taskDto));
+
+        TasksEntity savedTask = taskRepository.save(taskMapper.taskToTaskEntity(taskDto));
 
         return taskMapper.taskEntityToTaskDto(savedTask);
     }
@@ -46,22 +52,26 @@ public class TaskService {
     @AfterThrowing
     @AfterReturningLogging
     public TaskDto getTaskById(Long id) {
-        TaskEntity taskEntity = taskRepository.findTaskById(id)
+        TasksEntity tasksEntity = taskRepository.findTaskById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Task does not exist!"));
 
-        return taskMapper.taskEntityToTaskDto(taskEntity);
+        return taskMapper.taskEntityToTaskDto(tasksEntity);
     }
 
     @ExceptionLogging
     @Transactional
-    public TaskDto updateTask(Long id, TaskDto taskDto) {
-        TaskEntity taskEntity = taskRepository.updateTask(id, taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId());
+    @AfterReturningLogging
+    public TaskResponseDto updateTask(Long id, UpdatedDto updatedDto) {
+        TasksEntity updatedTask = taskRepository.updateTaskById(id, updatedDto.getTitle(),
+                updatedDto.getDescription(),
+                updatedDto.getUserId(),
+                updatedDto.getTaskStatus().toString()).orElseThrow(
+                        () -> new EntityNotFoundException(String.format("Task with %d not found", id)));
 
-        if (taskEntity == null) {
-            throw new EntityNotFoundException("Task not found");
-        }
 
-        return taskMapper.taskEntityToTaskDto(taskEntity);
+        KafkaDto kafkaDto = taskMapper.toKafkaDto(updatedTask);
+        kafkaTaskProducer.send(List.of(kafkaDto));
+        return taskMapper.toTaskResponseDto(updatedTask);
     }
 
     @Transactional

@@ -11,8 +11,8 @@ import lombok.*;
 @EqualsAndHashCode
 @Builder
 @Entity
-@Table(name = "task")
-public class TaskEntity {
+@Table(name = "tasks")
+public class TasksEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
@@ -26,7 +26,11 @@ public class TaskEntity {
     @Column(name = "user_id")
     private Long userId;
 
-    @Version()
+    @Version
     @Column(name = "version", nullable = false)
-    private Integer version = 0;
+    private Integer version;
+
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TaskStatus status;
 }

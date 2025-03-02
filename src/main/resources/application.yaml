@@ -1,10 +1,10 @@
 server:
-  port:8080
+  port: 8080
 
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:posgresql://localhost:5432//innotech
+    url: jdbc:postgresql://db:5432/innotech
     username: user
     password: password
 
@@ -20,3 +20,26 @@ spring:
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
+kafka:
+  bootstrap-servers: localhost:9092
+  consumer-group-id: email-group
+  session-timeout-ms: 10000
+  max-partition-fetch-bytes: 1048576
+  max-poll-records: 500
+  max-poll-interval-ms: 300000
+  task-topic: taskTopic
+  producer:
+    enable: true
+
+mail:
+  host: smtp.gmail.com
+  port:
+  username:
+  password:
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+  subjectForEmail: "Обновленная задача"

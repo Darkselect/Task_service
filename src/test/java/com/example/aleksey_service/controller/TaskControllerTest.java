@@ -1,6 +1,9 @@
 package com.example.aleksey_service.controller;
 
 import com.example.aleksey_service.dto.TaskDto;
+import com.example.aleksey_service.dto.TaskResponseDto;
+import com.example.aleksey_service.dto.UpdatedDto;
+import com.example.aleksey_service.entity.TaskStatus;
 import com.example.aleksey_service.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
@@ -45,6 +48,7 @@ public class TaskControllerTest {
                 .title("test title")
                 .description("test description")
                 .userId(1L)
+                .status(TaskStatus.CREATED)
                 .build();
 
         TaskDto expectedResponseDto = TaskDto.builder()
@@ -52,6 +56,7 @@ public class TaskControllerTest {
                 .title("test title")
                 .description("test description")
                 .userId(1L)
+                .status(TaskStatus.CREATED)
                 .build();
 
         when(taskService.createTask(any(TaskDto.class))).thenReturn(taskDto);
@@ -111,21 +116,23 @@ public class TaskControllerTest {
 
     @Test
     void testUpdateTaskSuccess() throws Exception {
-        TaskDto taskDto = TaskDto.builder()
+        TaskResponseDto taskDto = TaskResponseDto.builder()
                 .id(1L)
                 .title("Updated title")
                 .description("Updated description")
                 .userId(1L)
+                .status(TaskStatus.UPDATED)
                 .build();
 
-        TaskDto expectedResponseDto = TaskDto.builder()
+        TaskResponseDto expectedResponseDto = TaskResponseDto.builder()
                 .id(1L)
                 .title("test title")
                 .description("test description")
+                .status(TaskStatus.UPDATED)
                 .userId(1L)
                 .build();
 
-        when(taskService.updateTask(eq(taskDto.getId()), any(TaskDto.class))).thenReturn(expectedResponseDto);
+        when(taskService.updateTask(eq(taskDto.getId()), any(UpdatedDto.class))).thenReturn(expectedResponseDto);
 
         mvc.perform(put("/tasks/{id}", taskDto.getId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -140,9 +147,10 @@ public class TaskControllerTest {
                 .title("Updated title")
                 .description("Updated description")
                 .userId(1L)
+                .status(TaskStatus.UPDATED)
                 .build();
 
-        when(taskService.updateTask(eq(taskDto.getId()), any(TaskDto.class)))
+        when(taskService.updateTask(eq(taskDto.getId()), any(UpdatedDto.class)))
                 .thenThrow(new EntityNotFoundException("Task not found"));
 
         mvc.perform(put("/tasks/{id}", taskDto.getId())
@@ -185,8 +193,8 @@ public class TaskControllerTest {
     @Test
     void testGetTaskSuccess() throws Exception {
         List<TaskDto> tasks = List.of(
-                new TaskDto(1L, "Task 1", "Task description 1", 1L),
-                new TaskDto(2L, "Task 2", "Task description 2", 2L)
+                new TaskDto(1L, "Task 1", "Task description 1", 1L, TaskStatus.CREATED),
+                new TaskDto(2L, "Task 2", "Task description 2", 2L, TaskStatus.CREATED)
         );
 
 
