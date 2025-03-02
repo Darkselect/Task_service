@@ -28,11 +28,17 @@ repositories {
 
 
 dependencies {
+    // Lombok для удобства
+    annotationProcessor 'org.projectlombok:lombok'
+
     // MapStruct для маппинга DTO <-> Entity
-    implementation "org.mapstruct:mapstruct:1.5.3.Final"
     annotationProcessor "org.mapstruct:mapstruct-processor:1.5.3.Final"
+    implementation "org.mapstruct:mapstruct:1.5.3.Final"
 
 
+
+    //Spring Boot Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter'
@@ -53,7 +59,7 @@ dependencies {
 
     // Lombok для удобства
     compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+
 
     // Разработка и конфигурация
     developmentOnly 'org.springframework.boot:spring-boot-devtools'

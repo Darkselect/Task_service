@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/changeset/task_V002_add_version.sql
   - include:
       file: db/changelog/changeset/task_V003_add_status_column.sql
+  - include:
+      file: db/changelog/changeset/task_V004_rename_table_task.sql

@@ -1,6 +1,8 @@
 package com.example.aleksey_service.controller;
 
 import com.example.aleksey_service.dto.TaskDto;
+import com.example.aleksey_service.dto.TaskResponseDto;
+import com.example.aleksey_service.dto.UpdatedDto;
 import com.example.aleksey_service.service.TaskService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -44,7 +46,7 @@ public class TaskController {
 
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("tasks/{id}")
-    public TaskDto updateTaskById(@PathVariable Long id, @Valid @RequestBody TaskDto taskDto) {
+    public TaskResponseDto updateTaskById(@PathVariable Long id, @Valid @RequestBody UpdatedDto taskDto) {
         return taskService.updateTask(id, taskDto);
     }
 

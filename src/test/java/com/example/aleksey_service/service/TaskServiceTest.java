@@ -1,7 +1,12 @@
 package com.example.aleksey_service.service;
 
+import com.example.aleksey_service.dto.KafkaDto;
 import com.example.aleksey_service.dto.TaskDto;
-import com.example.aleksey_service.entity.TaskEntity;
+import com.example.aleksey_service.dto.TaskResponseDto;
+import com.example.aleksey_service.dto.UpdatedDto;
+import com.example.aleksey_service.entity.TaskStatus;
+import com.example.aleksey_service.entity.TasksEntity;
+import com.example.aleksey_service.kafka.KafkaTaskProducer;
 import com.example.aleksey_service.mapper.TaskMapper;
 import com.example.aleksey_service.repository.TaskRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,9 +22,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class TaskServiceTest {
@@ -32,6 +47,9 @@ public class TaskServiceTest {
     @Mock
     private TaskMapper taskMapper;
 
+    @Mock
+    private KafkaTaskProducer kafkaTaskProducer;
+
     private TaskDto createTaskDto(Long id, String title, String description, Long userId) {
         return TaskDto.builder()
                 .id(id)
@@ -41,8 +59,8 @@ public class TaskServiceTest {
                 .build();
     }
 
-    private TaskEntity createTaskEntity(String title, String description, Long userId) {
-        return TaskEntity.builder()
+    private TasksEntity createTaskEntity(String title, String description, Long userId) {
+        return TasksEntity.builder()
                 .id(1L)
                 .title(title)
                 .description(description)
@@ -53,12 +71,12 @@ public class TaskServiceTest {
     @Test
     void testCreateTaskSuccess() {
         TaskDto taskDto = createTaskDto(1L, "Test title", "test description", 1L);
-        TaskEntity taskEntity = createTaskEntity("Test title", "test description", 1L);
+        TasksEntity taskEntity = createTaskEntity("Test title", "test description", 1L);
 
         when(taskRepository.findTaskById(taskDto.getId())).thenReturn(Optional.empty());
-        when(taskRepository.save(any(TaskEntity.class))).thenReturn(taskEntity);
+        when(taskRepository.save(any(TasksEntity.class))).thenReturn(taskEntity);
         when(taskMapper.taskToTaskEntity(any(TaskDto.class))).thenReturn(taskEntity);
-        when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
+        when(taskMapper.taskEntityToTaskDto(any(TasksEntity.class))).thenReturn(taskDto);
 
         TaskDto createdTask = taskService.createTask(taskDto);
 
@@ -67,29 +85,29 @@ public class TaskServiceTest {
         assertEquals(taskDto.getTitle(), createdTask.getTitle());
         assertEquals(taskDto.getDescription(), createdTask.getDescription());
 
-        verify(taskRepository).save(any(TaskEntity.class));
+        verify(taskRepository).save(any(TasksEntity.class));
     }
 
     @Test
     void testCreateTaskAlreadyExists() {
         TaskDto taskDto = createTaskDto(1L, "Test title", "Test description", 1L);
-        TaskEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
+        TasksEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
 
         when(taskRepository.findTaskById(taskDto.getId())).thenReturn(Optional.of(taskEntity));
 
         Exception exception = assertThrows(RuntimeException.class, () -> taskService.createTask(taskDto));
 
         assertEquals(null, exception.getMessage());
-        verify(taskRepository, never()).save(any(TaskEntity.class));
+        verify(taskRepository, never()).save(any(TasksEntity.class));
     }
 
     @Test
     void testGetTaskByIdSuccess() {
         TaskDto taskDto = createTaskDto(1L, "Test title", "Test description", 1L);
-        TaskEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
+        TasksEntity taskEntity = createTaskEntity("Test title", "Test description", 1L);
 
         when(taskRepository.findTaskById(anyLong())).thenReturn(Optional.of(taskEntity));
-        when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
+        when(taskMapper.taskEntityToTaskDto(any(TasksEntity.class))).thenReturn(taskDto);
 
         TaskDto foundTask = taskService.getTaskById(1L);
 
@@ -110,37 +128,67 @@ public class TaskServiceTest {
     }
 
     @Test
-    void testUpdateTaskById() {
-        TaskDto taskDto = createTaskDto(1L, "Updated title", "Updated description", 2L);
-        TaskEntity taskEntity = createTaskEntity("Updated title", "Updated description", 2L);
+    void testUpdateSuccess() {
+        long taskId = 1L;
 
-        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus()))
-                .thenReturn(taskEntity);
-        when(taskMapper.taskEntityToTaskDto(any(TaskEntity.class))).thenReturn(taskDto);
+        UpdatedDto updatedDto = UpdatedDto.builder()
+                .title("Updated title")
+                .description("Updated description")
+                .userId(1L)
+                .taskStatus(TaskStatus.UPDATED)
+                .build();
 
-        TaskDto responseDto = taskService.updateTask(taskDto.getId(), taskDto);
+        TasksEntity mockTask = TasksEntity.builder()
+                .id(taskId)
+                .title("Updated title")
+                .description("Updated description")
+                .status(TaskStatus.UPDATED)
+                .build();
+
+        KafkaDto kafkaDto = KafkaDto.builder()
+                .id(taskId)
+                .status(TaskStatus.UPDATED)
+                .build();
+
+        when(taskRepository.updateTaskById(eq(taskId), anyString(), anyString(), anyLong(), anyString()))
+                .thenReturn(Optional.of(mockTask));
+        when(taskMapper.toKafkaDto(mockTask)).thenReturn(kafkaDto);
+        when(taskMapper.toTaskResponseDto(mockTask)).thenReturn(new TaskResponseDto(taskId, "Updated title", "Updated description", 2L, TaskStatus.UPDATED));
+
+        TaskResponseDto responseDto = taskService.updateTask(taskId, updatedDto);
 
         assertNotNull(responseDto);
-        assertEquals(taskDto.getId(), responseDto.getId());
-        assertEquals(taskDto.getTitle(), responseDto.getTitle());
-        assertEquals(taskDto.getDescription(), responseDto.getDescription());
-        assertEquals(taskDto.getUserId(), responseDto.getUserId());
+        assertEquals("Updated title", responseDto.getTitle());
+        assertEquals("Updated description", responseDto.getDescription());
+        assertEquals(1L, responseDto.getId());
+        assertEquals(TaskStatus.UPDATED, responseDto.getStatus());
 
-        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus());
-        verify(taskMapper).taskEntityToTaskDto(taskEntity);
+        verify(kafkaTaskProducer, times(1)).send(List.of(kafkaDto));
     }
 
     @Test
-    void testUpdateTaskByIdNotFound() {
-        TaskDto taskDto = createTaskDto(99L, "Updated title", "Updated description", 2L);
+    void testUpdateFailure_TaskNotFound() {
+        long taskId = 1L;
 
-        when(taskRepository.updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus()))
-                .thenReturn(null);
+        UpdatedDto updatedDto = UpdatedDto.builder()
+                .title("Updated title")
+                .description("Updated description")
+                .userId(1L)
+                .taskStatus(TaskStatus.UPDATED)
+                .build();
 
-        assertThrows(EntityNotFoundException.class, () -> taskService.updateTask(taskDto.getId(), taskDto));
+        when(taskRepository.updateTaskById(eq(taskId), anyString(), anyString(), anyLong(), anyString()))
+                .thenReturn(Optional.empty());
 
-        verify(taskRepository).updateTask(taskDto.getId(), taskDto.getTitle(), taskDto.getDescription(), taskDto.getUserId(), taskDto.getTaskStatus());
-        verify(taskMapper, never()).taskEntityToTaskDto(any());
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class,
+                () -> taskService.updateTask(taskId, updatedDto));
+
+        assertEquals("Task with " + taskId + " not found", exception.getMessage());
+
+        verify(taskRepository, times(1)).updateTaskById(eq(taskId), anyString(), anyString(), anyLong(), anyString());
+        verify(taskMapper, never()).toKafkaDto(any());
+        verify(taskMapper, never()).toTaskResponseDto(any());
+        verify(kafkaTaskProducer, never()).send(any());
     }
 
     @Test
@@ -169,7 +217,7 @@ public class TaskServiceTest {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        TaskEntity taskEntity = createTaskEntity("test title", "test description", 1L);
+        TasksEntity taskEntity = createTaskEntity("test title", "test description", 1L);
 
         TaskDto taskDto = createTaskDto(1L, "test title", "test description", 1L);
 
